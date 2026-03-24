@@ -34,6 +34,9 @@
   --mock-bg: #eff6ff;
   --mock-fg: #2563eb;
   --mock-border: #bfdbfe;
+  --review-bg: #fff8e6;
+  --review-fg: #b45309;
+  --review-border: #fcd34d;
 
   /* Variance */
   --variance-positive: #059669;
@@ -398,10 +401,50 @@ thead tr:nth-child(2) th:nth-child(8) {
   border-color: var(--mock-border);
 }
 
+.badge-export-review {
+  background: var(--review-bg);
+  color: var(--review-fg);
+  border-color: var(--review-border);
+}
+
+.badge-truth-only-review {
+  background: var(--review-bg);
+  color: var(--review-fg);
+  border-color: var(--review-border);
+}
+
 .badge-unmapped {
   background: #fff8e6;
   color: #b45309;
   border-color: #fcd34d;
+}
+
+/* ─── Review Note ───────────────────────────────────────────────────────────── */
+.review-note {
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--review-border);
+  border-left: 4px solid #d97706;
+  border-radius: 10px;
+  background: #fffbeb;
+  padding: 1rem 1.25rem;
+}
+
+.review-note-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #92400e;
+  margin-bottom: 0.55rem;
+}
+
+.review-note-list {
+  margin: 0;
+  padding-left: 1rem;
+  color: #78350f;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.86rem;
 }
 
 /* ─── Link Button ────────────────────────────────────────────────────────────── */
@@ -591,6 +634,12 @@ thead tr:nth-child(2) th:nth-child(8) {
 
 .token-card-pending-msg {
   padding: 0.5rem 0;
+}
+
+.token-card-pending-summary {
+  margin-top: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
 }
 
 .token-card-metrics {

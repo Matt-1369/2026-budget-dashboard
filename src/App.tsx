@@ -1,22 +1,54 @@
 import { useMemo, useState } from "react";
 import { reportConfig } from "./config";
+import { activeDataSource } from "./dataSource";
 import { formatCurrency, formatPercent } from "./formatters";
-import { budgetMaster, mappingTable, periodCalendar, rawActualDetail } from "./mockData";
 import { buildReportDataSet } from "./rollups";
-import type { AnnualRollup, TimeRollupRow, Token } from "./types";
+import type { AnnualRollup, MappingTableRow, RawActualDetailRow, TimeRollupRow, Token } from "./types";
+
+const isEnterpriseReviewMode = activeDataSource.mode === "enterprise_review";
 
 // ─── Helper Components ───────────────────────────────────────────────────────
+
+function isMappingMatch(rawValue: string, mappingValue: string | null): boolean {
+  return mappingValue === null || rawValue === mappingValue;
+}
+
+function findMapping(
+  actual: RawActualDetailRow,
+  mappingRows: MappingTableRow[],
+): MappingTableRow | undefined {
+  return mappingRows.find((mapping) => {
+    if (!mapping.active_flag) {
+      return false;
+    }
+
+    return (
+      isMappingMatch(actual.token_raw, mapping.token_raw) &&
+      isMappingMatch(actual.program_raw, mapping.program_raw) &&
+      isMappingMatch(actual.protocol_raw, mapping.protocol_raw) &&
+      isMappingMatch(actual.pool_raw, mapping.pool_raw)
+    );
+  });
+}
 
 function StatusBadge({ value }: { value: string }) {
   const variant = value.toLowerCase().replace(/\s+/g, "-");
   return <span className={`badge badge-${variant}`}>{value}</span>;
 }
 
-function VarianceCell({ value, pct }: { value: number | null; pct: number | null }) {
+function VarianceCell({
+  value,
+  pct,
+  pendingLabel = "Pending confirmation",
+}: {
+  value: number | null;
+  pct: number | null;
+  pendingLabel?: string;
+}) {
   if (value === null) {
     return (
       <td className="num-col">
-        <PendingValue />
+        <PendingValue label={pendingLabel} />
       </td>
     );
   }
@@ -31,15 +63,21 @@ function VarianceCell({ value, pct }: { value: number | null; pct: number | null
   );
 }
 
-function PendingValue() {
-  return <em className="pending-value">Pending confirmation</em>;
+function PendingValue({ label = "Pending confirmation" }: { label?: string }) {
+  return <em className="pending-value">{label}</em>;
 }
 
-function CurrencyCell({ value }: { value: number | null }) {
+function CurrencyCell({
+  value,
+  pendingLabel = "Pending confirmation",
+}: {
+  value: number | null;
+  pendingLabel?: string;
+}) {
   if (value === null) {
     return (
       <td className="num-col">
-        <PendingValue />
+        <PendingValue label={pendingLabel} />
       </td>
     );
   }
@@ -66,6 +104,23 @@ function CollapsibleSection({
       </button>
       {isOpen && <div className="collapsible-content">{children}</div>}
     </div>
+  );
+}
+
+function ReviewNotice() {
+  if (!activeDataSource.reviewNote) {
+    return null;
+  }
+
+  return (
+    <section className="review-note">
+      <div className="review-note-title">{activeDataSource.reviewNote.title}</div>
+      <ul className="review-note-list">
+        {activeDataSource.reviewNote.bullets.map((bullet) => (
+          <li key={bullet}>{bullet}</li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -105,9 +160,15 @@ function KpiStrip({ kpis }: { kpis: KPIData }) {
       ? `${formatPercent(kpis.budgetUtilization)} utilized`
       : undefined;
   const remainingStr =
-    kpis.remainingBudget !== null ? formatCurrency(kpis.remainingBudget) : "—";
+    kpis.remainingBudget !== null
+      ? formatCurrency(kpis.remainingBudget)
+      : activeDataSource.budgetFallbackLabel;
   const annualStr =
-    kpis.totalAnnualBudget !== null ? formatCurrency(kpis.totalAnnualBudget) : "—";
+    kpis.totalAnnualBudget !== null
+      ? formatCurrency(kpis.totalAnnualBudget)
+      : activeDataSource.budgetFallbackLabel;
+  const remainingSubtitle =
+    kpis.remainingBudget !== null ? utilStr : "Budget-derived remaining not finance-confirmed";
 
   return (
     <div className="kpi-strip">
@@ -118,7 +179,7 @@ function KpiStrip({ kpis }: { kpis: KPIData }) {
       <KpiCard
         label="Remaining Budget"
         value={remainingStr}
-        subtitle={utilStr}
+        subtitle={remainingSubtitle}
       />
     </div>
   );
@@ -156,6 +217,46 @@ function TokenCard({
         : ""
       : "";
 
+  if (isEnterpriseReviewMode) {
+    return (
+      <div className={`token-card${isSelected ? " selected" : ""}`}>
+        <div className="token-card-header">
+          <button className="link-button" onClick={onSelect}>
+            {row.token}
+          </button>
+          <StatusBadge value={row.approval_status} />
+        </div>
+
+        <div className="token-card-metrics">
+          <div className="token-card-metric">
+            <div className="token-card-metric-label">YTD Raw USD Activity</div>
+            <div className="token-card-metric-value">{formatCurrency(row.actual_ytd)}</div>
+          </div>
+          <div className="token-card-metric">
+            <div className="token-card-metric-label">
+              {reportConfig.current_month_label} Raw USD Activity
+            </div>
+            <div className="token-card-metric-value">
+              {formatCurrency(row.current_month_actual)}
+            </div>
+          </div>
+          <div className="token-card-metric">
+            <div className="token-card-metric-label">
+              {currentPeriodLabel} Raw USD Activity
+            </div>
+            <div className="token-card-metric-value">
+              {formatCurrency(row.current_period_actual)}
+            </div>
+          </div>
+        </div>
+
+        <div className="note">
+          Annual budget source and finance-confirmed actual spend remain blocked in enterprise staging.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`token-card${isSelected ? " selected" : ""}${isPending ? " pending-state" : ""}`}
@@ -169,7 +270,15 @@ function TokenCard({
 
       {isPending ? (
         <div className="token-card-pending-msg">
-          <PendingValue />
+          <PendingValue label={activeDataSource.budgetFallbackLabel} />
+          <div className="token-card-pending-summary">
+            YTD actual: {formatCurrency(row.actual_ytd)} · {reportConfig.current_month_label} actual:{" "}
+            {formatCurrency(row.current_month_actual)} · {currentPeriodLabel} actual:{" "}
+            {formatCurrency(row.current_period_actual)}
+          </div>
+          <div className="note">
+            Budget-derived remaining and variance stay blocked until an annual budget source is confirmed.
+          </div>
         </div>
       ) : (
         <>
@@ -186,15 +295,15 @@ function TokenCard({
                 {formatCurrency(row.actual_ytd)}
               </div>
             </div>
-            <div className="token-card-metric">
-              <div className="token-card-metric-label">Remaining</div>
-              <div className="token-card-metric-value">
-                {row.remaining_budget !== null
-                  ? formatCurrency(row.remaining_budget)
-                  : "—"}
+              <div className="token-card-metric">
+                <div className="token-card-metric-label">Remaining</div>
+                <div className="token-card-metric-value">
+                  {row.remaining_budget !== null
+                    ? formatCurrency(row.remaining_budget)
+                    : activeDataSource.budgetFallbackLabel}
+                </div>
               </div>
             </div>
-          </div>
 
           {utilization !== null && (
             <div className="progress-bar-track">
@@ -306,42 +415,65 @@ function TimeRollupTable({
       <div className="table-scroll">
         <table>
           <thead>
-            <tr>
-              <th>Program</th>
-              <th>Period</th>
-              <th className="num-col">Budget</th>
-              <th className="num-col">Actual</th>
-              <th className="num-col">Variance</th>
-              <th className="num-col">Variance %</th>
-            </tr>
+            {isEnterpriseReviewMode ? (
+              <tr>
+                <th>Program</th>
+                <th>Window</th>
+                <th className="num-col">Raw USD Activity</th>
+              </tr>
+            ) : (
+              <tr>
+                <th>Program</th>
+                <th>Period</th>
+                <th className="num-col">Budget</th>
+                <th className="num-col">Actual</th>
+                <th className="num-col">Variance</th>
+                <th className="num-col">Variance %</th>
+              </tr>
+            )}
           </thead>
           <tbody>
-            {visibleRows.map((row) => (
-              <tr key={row.key}>
-                <td>{row.reporting_bucket}</td>
-                <td>{row.time_key}</td>
-                <CurrencyCell value={row.budget} />
-                <td className="num-col">{formatCurrency(row.actual)}</td>
-                <VarianceCell value={row.variance} pct={null} />
-                <td className="num-col">
-                  {row.variance_pct !== null ? (
-                    <span
-                      className={
-                        row.variance_pct < 0
-                          ? "variance-negative"
-                          : row.variance_pct > 0
-                          ? "variance-positive"
-                          : ""
-                      }
-                    >
-                      {formatPercent(row.variance_pct)}
-                    </span>
-                  ) : (
-                    <PendingValue />
-                  )}
-                </td>
-              </tr>
-            ))}
+            {visibleRows.map((row) =>
+              isEnterpriseReviewMode ? (
+                <tr key={row.key}>
+                  <td>{row.reporting_bucket}</td>
+                  <td>{row.time_key}</td>
+                  <td className="num-col">{formatCurrency(row.actual)}</td>
+                </tr>
+              ) : (
+                <tr key={row.key}>
+                  <td>{row.reporting_bucket}</td>
+                  <td>{row.time_key}</td>
+                  <CurrencyCell
+                    value={row.budget}
+                    pendingLabel={activeDataSource.budgetFallbackLabel}
+                  />
+                  <td className="num-col">{formatCurrency(row.actual)}</td>
+                  <VarianceCell
+                    value={row.variance}
+                    pct={null}
+                    pendingLabel={activeDataSource.budgetFallbackLabel}
+                  />
+                  <td className="num-col">
+                    {row.variance_pct !== null ? (
+                      <span
+                        className={
+                          row.variance_pct < 0
+                            ? "variance-negative"
+                            : row.variance_pct > 0
+                              ? "variance-positive"
+                              : ""
+                        }
+                      >
+                        {formatPercent(row.variance_pct)}
+                      </span>
+                    ) : (
+                      <PendingValue label={activeDataSource.budgetFallbackLabel} />
+                    )}
+                  </td>
+                </tr>
+              ),
+            )}
           </tbody>
         </table>
       </div>
@@ -366,34 +498,72 @@ function DrilldownTable({ rows }: { rows: AnnualRollup[] }) {
     <div className="table-scroll">
       <table>
         <thead>
-          <tr>
-            <th>Program</th>
-            <th className="num-col">Annual Budget</th>
-            <th className="num-col">YTD Actual</th>
-            <th className="num-col">Remaining</th>
-            <th className="num-col">Monthly Budget</th>
-            <th className="num-col">Cur. Month Actual</th>
-            <th className="num-col">Period Budget</th>
-            <th className="num-col">Cur. Period Actual</th>
-            <th className="num-col">Variance</th>
-            <th>Notes</th>
-          </tr>
+          {isEnterpriseReviewMode ? (
+            <tr>
+              <th>Program</th>
+              <th className="num-col">YTD Raw USD Activity</th>
+              <th className="num-col">{reportConfig.current_month_label} Raw USD Activity</th>
+              <th className="num-col">
+                P{String(reportConfig.current_period_index).padStart(2, "0")} Raw USD Activity
+              </th>
+              <th>Notes</th>
+            </tr>
+          ) : (
+            <tr>
+              <th>Program</th>
+              <th className="num-col">Annual Budget</th>
+              <th className="num-col">YTD Actual</th>
+              <th className="num-col">Remaining</th>
+              <th className="num-col">Monthly Budget</th>
+              <th className="num-col">Cur. Month Actual</th>
+              <th className="num-col">Period Budget</th>
+              <th className="num-col">Cur. Period Actual</th>
+              <th className="num-col">Variance</th>
+              <th>Notes</th>
+            </tr>
+          )}
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.key}>
-              <td>{row.reporting_bucket}</td>
-              <CurrencyCell value={row.annual_budget} />
-              <td className="num-col">{formatCurrency(row.actual_ytd)}</td>
-              <CurrencyCell value={row.remaining_budget} />
-              <CurrencyCell value={row.monthly_budget} />
-              <td className="num-col">{formatCurrency(row.current_month_actual)}</td>
-              <CurrencyCell value={row.period_budget} />
-              <td className="num-col">{formatCurrency(row.current_period_actual)}</td>
-              <VarianceCell value={row.variance} pct={row.variance_pct} />
-              <td>{row.notes[0]}</td>
-            </tr>
-          ))}
+          {rows.map((row) =>
+            isEnterpriseReviewMode ? (
+              <tr key={row.key}>
+                <td>{row.reporting_bucket}</td>
+                <td className="num-col">{formatCurrency(row.actual_ytd)}</td>
+                <td className="num-col">{formatCurrency(row.current_month_actual)}</td>
+                <td className="num-col">{formatCurrency(row.current_period_actual)}</td>
+                <td>{row.notes[0]}</td>
+              </tr>
+            ) : (
+              <tr key={row.key}>
+                <td>{row.reporting_bucket}</td>
+                <CurrencyCell
+                  value={row.annual_budget}
+                  pendingLabel={activeDataSource.budgetFallbackLabel}
+                />
+                <td className="num-col">{formatCurrency(row.actual_ytd)}</td>
+                <CurrencyCell
+                  value={row.remaining_budget}
+                  pendingLabel={activeDataSource.budgetFallbackLabel}
+                />
+                <CurrencyCell
+                  value={row.monthly_budget}
+                  pendingLabel={activeDataSource.budgetFallbackLabel}
+                />
+                <td className="num-col">{formatCurrency(row.current_month_actual)}</td>
+                <CurrencyCell
+                  value={row.period_budget}
+                  pendingLabel={activeDataSource.budgetFallbackLabel}
+                />
+                <td className="num-col">{formatCurrency(row.current_period_actual)}</td>
+                <VarianceCell
+                  value={row.variance}
+                  pct={row.variance_pct}
+                  pendingLabel={activeDataSource.budgetFallbackLabel}
+                />
+                <td>{row.notes[0]}</td>
+              </tr>
+            ),
+          )}
         </tbody>
       </table>
     </div>
@@ -427,25 +597,41 @@ function ExecInsights({
       ? formatPercent(kpis.budgetUtilization)
       : null;
 
+  if (isEnterpriseReviewMode) {
+    return null;
+  }
+
   return (
     <div className="exec-insights">
       <div className="exec-insights-title">Key Observations</div>
       <ul className="exec-insights-list">
-        <li>
-          Current reporting total across {includedTokens.length} token
-          {includedTokens.length !== 1 ? "s" : ""} ({includedTokens.join(", ")}
-          ): <strong>{kpis.totalAnnualBudget !== null ? formatCurrency(kpis.totalAnnualBudget) : "—"}</strong>.
-          {confirmedTokens.length > 0 && (
-            <>{" "}Confirmed: {confirmedTokens.join(", ")}.</>
-          )}
-          {draftTokens.length > 0 && (
-            <>{" "}Draft: {draftTokens.join(", ")}.</>
-          )}
-        </li>
+        {includedTokens.length > 0 ? (
+          <li>
+            Current reporting total across {includedTokens.length} token
+            {includedTokens.length !== 1 ? "s" : ""} ({includedTokens.join(", ")}
+            ): <strong>{kpis.totalAnnualBudget !== null ? formatCurrency(kpis.totalAnnualBudget) : activeDataSource.budgetFallbackLabel}</strong>.
+            {confirmedTokens.length > 0 && (
+              <>{" "}Confirmed: {confirmedTokens.join(", ")}.</>
+            )}
+            {draftTokens.length > 0 && (
+              <>{" "}Draft: {draftTokens.join(", ")}.</>
+            )}
+          </li>
+        ) : (
+          <li>
+            No finance-confirmed annual budgets are available in this data source, so budget-derived totals remain{" "}
+            <strong>{activeDataSource.budgetFallbackLabel.toLowerCase()}</strong>.
+          </li>
+        )}
         {pendingTokens.length > 0 && (
           <li>
             Budget not yet available for{" "}
             <strong>{pendingTokens.join(", ")}</strong> — not included in totals.
+          </li>
+        )}
+        {includedTokens.length === 0 && (
+          <li>
+            Assumption-based actual activity is still visible for review, but it should not be interpreted as finance-confirmed spend.
           </li>
         )}
         {utilPct && (
@@ -460,10 +646,62 @@ function ExecInsights({
   );
 }
 
+function UnmappedRowsPanel({ rows }: { rows: RawActualDetailRow[] }) {
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div>
+          <h2>Unmapped Raw Activity</h2>
+          <p className="panel-sub">
+            These rows stay visible because they do not have an active mapping match.
+          </p>
+        </div>
+      </div>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Token</th>
+              <th>Program Raw</th>
+              <th>Protocol</th>
+              <th>Pool</th>
+              <th>Period</th>
+              <th className="num-col">
+                {isEnterpriseReviewMode ? "Raw USD Activity" : "Actual"}
+              </th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id}>
+                <td>{row.token_raw}</td>
+                <td>{row.program_raw}</td>
+                <td>{row.protocol_raw}</td>
+                <td>{row.pool_raw}</td>
+                <td>{row.period_id}</td>
+                <td className="num-col">{formatCurrency(row.amount)}</td>
+                <td>{row.metadata.unmapped_reason ?? row.metadata.issue ?? "Pending mapping review"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [selectedToken, setSelectedToken] = useState<Token>("DEEP");
+  const [selectedToken, setSelectedToken] = useState<Token>(
+    reportConfig.enabled_program_breakdown[0] ?? "SUI",
+  );
+  const { budgetMaster, mappingTable, periodCalendar, rawActualDetail } = activeDataSource.input;
 
   const report = useMemo(
     () =>
@@ -474,6 +712,12 @@ export default function App() {
         periodCalendar,
       ),
     [],
+  );
+
+  const unmappedRows = useMemo(
+    () =>
+      rawActualDetail.filter((row) => !findMapping(row, mappingTable)),
+    [mappingTable, rawActualDetail],
   );
 
   const drilldown = report.drilldownByToken[selectedToken];
@@ -511,8 +755,12 @@ export default function App() {
       {/* ── Executive Header ── */}
       <header className="exec-header">
         <div className="exec-header-title-block">
-          <p className="eyebrow">2026 Budget Report</p>
-          <h1>Budget vs Actual Dashboard</h1>
+          <p className="eyebrow">
+            {isEnterpriseReviewMode ? "2026 Enterprise Review" : "2026 Budget Report"}
+          </p>
+          <h1>
+            {isEnterpriseReviewMode ? "Truth-Only Raw USD Activity Review" : "Budget vs Actual Dashboard"}
+          </h1>
         </div>
         <div className="exec-header-meta">
           <span className="meta-pill">
@@ -527,7 +775,7 @@ export default function App() {
             <span className="meta-label">Period</span>
             <strong>{currentPeriodLabel}</strong>
           </span>
-          <StatusBadge value="Mock data" />
+          <StatusBadge value={activeDataSource.badgeLabel} />
           {report.unmappedCount > 0 && (
             <span className="badge badge-unmapped">
               {report.unmappedCount} unmapped row{report.unmappedCount !== 1 ? "s" : ""}
@@ -536,17 +784,31 @@ export default function App() {
         </div>
       </header>
 
+      <ReviewNotice />
+
       {/* ── KPI Hero Strip ── */}
-      <KpiStrip kpis={kpis} />
+      {!isEnterpriseReviewMode && <KpiStrip kpis={kpis} />}
 
       {/* ── Token Summary ── */}
       <section className="panel">
         <div className="panel-header">
           <div>
-            <h2>Token Summary</h2>
+            <h2>{isEnterpriseReviewMode ? "Token Activity Summary" : "Token Summary"}</h2>
             <p className="panel-sub">
-              Current month: <strong>{reportConfig.current_month_label}</strong>&ensp;·&ensp;
-              Current period: <strong>{currentPeriodLabel}</strong>
+              {isEnterpriseReviewMode
+                ? (
+                  <>
+                    Enterprise staging raw USD activity view. Current month:{" "}
+                    <strong>{reportConfig.current_month_label}</strong>&ensp;·&ensp;Current period:{" "}
+                    <strong>{currentPeriodLabel}</strong>
+                  </>
+                )
+                : (
+                  <>
+                    Current month: <strong>{reportConfig.current_month_label}</strong>&ensp;·&ensp;
+                    Current period: <strong>{currentPeriodLabel}</strong>
+                  </>
+                )}
             </p>
           </div>
         </div>
@@ -557,13 +819,15 @@ export default function App() {
         />
       </section>
 
+      <UnmappedRowsPanel rows={unmappedRows} />
+
       {/* ── Token Drilldown ── */}
       <section className="panel">
         <div className="panel-header">
           <div>
-            <h2>Token Drilldown</h2>
+            <h2>{isEnterpriseReviewMode ? "Token Activity Drilldown" : "Token Drilldown"}</h2>
             <p className="panel-sub">
-              Program-level breakdown for{" "}
+              {isEnterpriseReviewMode ? "Program-level raw USD activity for " : "Program-level breakdown for "}
               <strong>{reportConfig.enabled_program_breakdown.join(", ")}</strong>
             </p>
           </div>
@@ -582,26 +846,29 @@ export default function App() {
 
         {drilldown ? (
           <>
-            <CollapsibleSection title="Annual Breakdown" defaultOpen={false}>
+            <CollapsibleSection
+              title={isEnterpriseReviewMode ? "Activity Breakdown" : "Annual Breakdown"}
+              defaultOpen={false}
+            >
               <DrilldownTable rows={drilldown.annual} />
             </CollapsibleSection>
 
             <div className="two-column">
               <TimeRollupTable
-                title="Monthly View"
+                title={isEnterpriseReviewMode ? "Monthly Activity View" : "Monthly View"}
                 rows={drilldown.monthly}
                 recentCount={3}
                 currentTimeKey={reportConfig.current_month_label}
               />
               <TimeRollupTable
-                title="OBL Period View"
+                title={isEnterpriseReviewMode ? "OBL Period Activity View" : "OBL Period View"}
                 rows={drilldown.period}
                 recentCount={4}
                 currentTimeKey={currentPeriodLabel}
               />
             </div>
 
-            <ExecInsights summary={report.summary} kpis={kpis} />
+            {!isEnterpriseReviewMode && <ExecInsights summary={report.summary} kpis={kpis} />}
           </>
         ) : (
           <p className="muted">No drilldown configured for this token yet.</p>
@@ -610,7 +877,9 @@ export default function App() {
 
       {/* ── Status Footer ── */}
       <div className="status-footer">
-        <span className="status-footer-label">Budget status:</span>
+        <span className="status-footer-label">
+          {isEnterpriseReviewMode ? "Review status:" : "Budget status:"}
+        </span>
         {(() => {
           const confirmed = report.summary.filter((r) => r.approval_status === "confirmed").map((r) => r.token);
           const draft = report.summary.filter((r) => r.approval_status === "draft").map((r) => r.token);
@@ -627,7 +896,7 @@ export default function App() {
                 <><span className="status-footer-sep">·</span><span><strong>Pending:</strong> {pending.join(", ")}</span></>
               )}
               <span className="status-footer-sep">·</span>
-              <span className="status-footer-also-pending">Also pending: period count, DEEP hierarchy, OBL mappings</span>
+              <span className="status-footer-also-pending">{activeDataSource.footerPendingNote}</span>
             </>
           );
         })()}
