@@ -5,8 +5,6 @@ import { formatCurrency, formatPercent } from "./formatters";
 import { buildReportDataSet } from "./rollups";
 import type { AnnualRollup, MappingTableRow, RawActualDetailRow, TimeRollupRow, Token } from "./types";
 
-const isEnterpriseReviewMode = activeDataSource.mode === "enterprise_review";
-
 // ─── Helper Components ───────────────────────────────────────────────────────
 
 function isMappingMatch(rawValue: string, mappingValue: string | null): boolean {
@@ -168,7 +166,9 @@ function KpiStrip({ kpis }: { kpis: KPIData }) {
       ? formatCurrency(kpis.totalAnnualBudget)
       : activeDataSource.budgetFallbackLabel;
   const remainingSubtitle =
-    kpis.remainingBudget !== null ? utilStr : "Budget-derived remaining not finance-confirmed";
+    kpis.remainingBudget !== null
+      ? utilStr
+      : "Remaining budget is unavailable until the Finance input file is populated for those rows.";
 
   return (
     <div className="kpi-strip">
@@ -217,46 +217,6 @@ function TokenCard({
         : ""
       : "";
 
-  if (isEnterpriseReviewMode) {
-    return (
-      <div className={`token-card${isSelected ? " selected" : ""}`}>
-        <div className="token-card-header">
-          <button className="link-button" onClick={onSelect}>
-            {row.token}
-          </button>
-          <StatusBadge value={row.approval_status} />
-        </div>
-
-        <div className="token-card-metrics">
-          <div className="token-card-metric">
-            <div className="token-card-metric-label">YTD Raw USD Activity</div>
-            <div className="token-card-metric-value">{formatCurrency(row.actual_ytd)}</div>
-          </div>
-          <div className="token-card-metric">
-            <div className="token-card-metric-label">
-              {reportConfig.current_month_label} Raw USD Activity
-            </div>
-            <div className="token-card-metric-value">
-              {formatCurrency(row.current_month_actual)}
-            </div>
-          </div>
-          <div className="token-card-metric">
-            <div className="token-card-metric-label">
-              {currentPeriodLabel} Raw USD Activity
-            </div>
-            <div className="token-card-metric-value">
-              {formatCurrency(row.current_period_actual)}
-            </div>
-          </div>
-        </div>
-
-        <div className="note">
-          Annual budget source and finance-confirmed actual spend remain blocked in enterprise staging.
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       className={`token-card${isSelected ? " selected" : ""}${isPending ? " pending-state" : ""}`}
@@ -277,7 +237,7 @@ function TokenCard({
             {formatCurrency(row.current_period_actual)}
           </div>
           <div className="note">
-            Budget-derived remaining and variance stay blocked until an annual budget source is confirmed.
+            Budget source-of-truth is confirmed for v1, but the local Finance input file does not yet include an annual value for this row.
           </div>
         </div>
       ) : (
@@ -415,65 +375,49 @@ function TimeRollupTable({
       <div className="table-scroll">
         <table>
           <thead>
-            {isEnterpriseReviewMode ? (
-              <tr>
-                <th>Program</th>
-                <th>Window</th>
-                <th className="num-col">Raw USD Activity</th>
-              </tr>
-            ) : (
-              <tr>
-                <th>Program</th>
-                <th>Period</th>
-                <th className="num-col">Budget</th>
-                <th className="num-col">Actual</th>
-                <th className="num-col">Variance</th>
-                <th className="num-col">Variance %</th>
-              </tr>
-            )}
+            <tr>
+              <th>Program</th>
+              <th>Period</th>
+              <th className="num-col">Budget</th>
+              <th className="num-col">Actual</th>
+              <th className="num-col">Variance</th>
+              <th className="num-col">Variance %</th>
+            </tr>
           </thead>
           <tbody>
-            {visibleRows.map((row) =>
-              isEnterpriseReviewMode ? (
-                <tr key={row.key}>
-                  <td>{row.reporting_bucket}</td>
-                  <td>{row.time_key}</td>
-                  <td className="num-col">{formatCurrency(row.actual)}</td>
-                </tr>
-              ) : (
-                <tr key={row.key}>
-                  <td>{row.reporting_bucket}</td>
-                  <td>{row.time_key}</td>
-                  <CurrencyCell
-                    value={row.budget}
-                    pendingLabel={activeDataSource.budgetFallbackLabel}
-                  />
-                  <td className="num-col">{formatCurrency(row.actual)}</td>
-                  <VarianceCell
-                    value={row.variance}
-                    pct={null}
-                    pendingLabel={activeDataSource.budgetFallbackLabel}
-                  />
-                  <td className="num-col">
-                    {row.variance_pct !== null ? (
-                      <span
-                        className={
-                          row.variance_pct < 0
-                            ? "variance-negative"
-                            : row.variance_pct > 0
-                              ? "variance-positive"
-                              : ""
-                        }
-                      >
-                        {formatPercent(row.variance_pct)}
-                      </span>
-                    ) : (
-                      <PendingValue label={activeDataSource.budgetFallbackLabel} />
-                    )}
-                  </td>
-                </tr>
-              ),
-            )}
+            {visibleRows.map((row) => (
+              <tr key={row.key}>
+                <td>{row.reporting_bucket}</td>
+                <td>{row.time_key}</td>
+                <CurrencyCell
+                  value={row.budget}
+                  pendingLabel={activeDataSource.budgetFallbackLabel}
+                />
+                <td className="num-col">{formatCurrency(row.actual)}</td>
+                <VarianceCell
+                  value={row.variance}
+                  pct={null}
+                  pendingLabel={activeDataSource.budgetFallbackLabel}
+                />
+                <td className="num-col">
+                  {row.variance_pct !== null ? (
+                    <span
+                      className={
+                        row.variance_pct < 0
+                          ? "variance-negative"
+                          : row.variance_pct > 0
+                            ? "variance-positive"
+                            : ""
+                      }
+                    >
+                      {formatPercent(row.variance_pct)}
+                    </span>
+                  ) : (
+                    <PendingValue label={activeDataSource.budgetFallbackLabel} />
+                  )}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -498,72 +442,50 @@ function DrilldownTable({ rows }: { rows: AnnualRollup[] }) {
     <div className="table-scroll">
       <table>
         <thead>
-          {isEnterpriseReviewMode ? (
-            <tr>
-              <th>Program</th>
-              <th className="num-col">YTD Raw USD Activity</th>
-              <th className="num-col">{reportConfig.current_month_label} Raw USD Activity</th>
-              <th className="num-col">
-                P{String(reportConfig.current_period_index).padStart(2, "0")} Raw USD Activity
-              </th>
-              <th>Notes</th>
-            </tr>
-          ) : (
-            <tr>
-              <th>Program</th>
-              <th className="num-col">Annual Budget</th>
-              <th className="num-col">YTD Actual</th>
-              <th className="num-col">Remaining</th>
-              <th className="num-col">Monthly Budget</th>
-              <th className="num-col">Cur. Month Actual</th>
-              <th className="num-col">Period Budget</th>
-              <th className="num-col">Cur. Period Actual</th>
-              <th className="num-col">Variance</th>
-              <th>Notes</th>
-            </tr>
-          )}
+          <tr>
+            <th>Program</th>
+            <th className="num-col">Annual Budget</th>
+            <th className="num-col">YTD Actual</th>
+            <th className="num-col">Remaining</th>
+            <th className="num-col">Monthly Budget</th>
+            <th className="num-col">Cur. Month Actual</th>
+            <th className="num-col">Period Budget</th>
+            <th className="num-col">Cur. Period Actual</th>
+            <th className="num-col">Variance</th>
+            <th>Notes</th>
+          </tr>
         </thead>
         <tbody>
-          {rows.map((row) =>
-            isEnterpriseReviewMode ? (
-              <tr key={row.key}>
-                <td>{row.reporting_bucket}</td>
-                <td className="num-col">{formatCurrency(row.actual_ytd)}</td>
-                <td className="num-col">{formatCurrency(row.current_month_actual)}</td>
-                <td className="num-col">{formatCurrency(row.current_period_actual)}</td>
-                <td>{row.notes[0]}</td>
-              </tr>
-            ) : (
-              <tr key={row.key}>
-                <td>{row.reporting_bucket}</td>
-                <CurrencyCell
-                  value={row.annual_budget}
-                  pendingLabel={activeDataSource.budgetFallbackLabel}
-                />
-                <td className="num-col">{formatCurrency(row.actual_ytd)}</td>
-                <CurrencyCell
-                  value={row.remaining_budget}
-                  pendingLabel={activeDataSource.budgetFallbackLabel}
-                />
-                <CurrencyCell
-                  value={row.monthly_budget}
-                  pendingLabel={activeDataSource.budgetFallbackLabel}
-                />
-                <td className="num-col">{formatCurrency(row.current_month_actual)}</td>
-                <CurrencyCell
-                  value={row.period_budget}
-                  pendingLabel={activeDataSource.budgetFallbackLabel}
-                />
-                <td className="num-col">{formatCurrency(row.current_period_actual)}</td>
-                <VarianceCell
-                  value={row.variance}
-                  pct={row.variance_pct}
-                  pendingLabel={activeDataSource.budgetFallbackLabel}
-                />
-                <td>{row.notes[0]}</td>
-              </tr>
-            ),
-          )}
+          {rows.map((row) => (
+            <tr key={row.key}>
+              <td>{row.reporting_bucket}</td>
+              <CurrencyCell
+                value={row.annual_budget}
+                pendingLabel={activeDataSource.budgetFallbackLabel}
+              />
+              <td className="num-col">{formatCurrency(row.actual_ytd)}</td>
+              <CurrencyCell
+                value={row.remaining_budget}
+                pendingLabel={activeDataSource.budgetFallbackLabel}
+              />
+              <CurrencyCell
+                value={row.monthly_budget}
+                pendingLabel={activeDataSource.budgetFallbackLabel}
+              />
+              <td className="num-col">{formatCurrency(row.current_month_actual)}</td>
+              <CurrencyCell
+                value={row.period_budget}
+                pendingLabel={activeDataSource.budgetFallbackLabel}
+              />
+              <td className="num-col">{formatCurrency(row.current_period_actual)}</td>
+              <VarianceCell
+                value={row.variance}
+                pct={row.variance_pct}
+                pendingLabel={activeDataSource.budgetFallbackLabel}
+              />
+              <td>{row.notes[0]}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
@@ -597,10 +519,6 @@ function ExecInsights({
       ? formatPercent(kpis.budgetUtilization)
       : null;
 
-  if (isEnterpriseReviewMode) {
-    return null;
-  }
-
   return (
     <div className="exec-insights">
       <div className="exec-insights-title">Key Observations</div>
@@ -619,19 +537,18 @@ function ExecInsights({
           </li>
         ) : (
           <li>
-            No finance-confirmed annual budgets are available in this data source, so budget-derived totals remain{" "}
-            <strong>{activeDataSource.budgetFallbackLabel.toLowerCase()}</strong>.
+            Budget source-of-truth is confirmed for v1, but the local Finance input file does not yet include populated annual budget rows.
           </li>
         )}
         {pendingTokens.length > 0 && (
           <li>
-            Budget not yet available for{" "}
+            Annual budget values are not populated in the local Finance input file for{" "}
             <strong>{pendingTokens.join(", ")}</strong> — not included in totals.
           </li>
         )}
         {includedTokens.length === 0 && (
           <li>
-            Assumption-based actual activity is still visible for review, but it should not be interpreted as finance-confirmed spend.
+            Actuals in this mode follow the confirmed SQL source that is internally aligned with OBL All Historical Summary.
           </li>
         )}
         {utilPct && (
@@ -670,9 +587,7 @@ function UnmappedRowsPanel({ rows }: { rows: RawActualDetailRow[] }) {
               <th>Protocol</th>
               <th>Pool</th>
               <th>Period</th>
-              <th className="num-col">
-                {isEnterpriseReviewMode ? "Raw USD Activity" : "Actual"}
-              </th>
+              <th className="num-col">Actual</th>
               <th>Reason</th>
             </tr>
           </thead>
@@ -755,12 +670,8 @@ export default function App() {
       {/* ── Executive Header ── */}
       <header className="exec-header">
         <div className="exec-header-title-block">
-          <p className="eyebrow">
-            {isEnterpriseReviewMode ? "2026 Enterprise Review" : "2026 Budget Report"}
-          </p>
-          <h1>
-            {isEnterpriseReviewMode ? "Truth-Only Raw USD Activity Review" : "Budget vs Actual Dashboard"}
-          </h1>
+          <p className="eyebrow">2026 Budget Report</p>
+          <h1>Budget vs Actual Dashboard</h1>
         </div>
         <div className="exec-header-meta">
           <span className="meta-pill">
@@ -787,28 +698,16 @@ export default function App() {
       <ReviewNotice />
 
       {/* ── KPI Hero Strip ── */}
-      {!isEnterpriseReviewMode && <KpiStrip kpis={kpis} />}
+      <KpiStrip kpis={kpis} />
 
       {/* ── Token Summary ── */}
       <section className="panel">
         <div className="panel-header">
           <div>
-            <h2>{isEnterpriseReviewMode ? "Token Activity Summary" : "Token Summary"}</h2>
+            <h2>Token Summary</h2>
             <p className="panel-sub">
-              {isEnterpriseReviewMode
-                ? (
-                  <>
-                    Enterprise staging raw USD activity view. Current month:{" "}
-                    <strong>{reportConfig.current_month_label}</strong>&ensp;·&ensp;Current period:{" "}
-                    <strong>{currentPeriodLabel}</strong>
-                  </>
-                )
-                : (
-                  <>
-                    Current month: <strong>{reportConfig.current_month_label}</strong>&ensp;·&ensp;
-                    Current period: <strong>{currentPeriodLabel}</strong>
-                  </>
-                )}
+              Current month: <strong>{reportConfig.current_month_label}</strong>&ensp;·&ensp;
+              Current period: <strong>{currentPeriodLabel}</strong>
             </p>
           </div>
         </div>
@@ -825,9 +724,9 @@ export default function App() {
       <section className="panel">
         <div className="panel-header">
           <div>
-            <h2>{isEnterpriseReviewMode ? "Token Activity Drilldown" : "Token Drilldown"}</h2>
+            <h2>Token Drilldown</h2>
             <p className="panel-sub">
-              {isEnterpriseReviewMode ? "Program-level raw USD activity for " : "Program-level breakdown for "}
+              Program-level breakdown for{" "}
               <strong>{reportConfig.enabled_program_breakdown.join(", ")}</strong>
             </p>
           </div>
@@ -846,29 +745,26 @@ export default function App() {
 
         {drilldown ? (
           <>
-            <CollapsibleSection
-              title={isEnterpriseReviewMode ? "Activity Breakdown" : "Annual Breakdown"}
-              defaultOpen={false}
-            >
+            <CollapsibleSection title="Annual Breakdown" defaultOpen={false}>
               <DrilldownTable rows={drilldown.annual} />
             </CollapsibleSection>
 
             <div className="two-column">
               <TimeRollupTable
-                title={isEnterpriseReviewMode ? "Monthly Activity View" : "Monthly View"}
+                title="Monthly View"
                 rows={drilldown.monthly}
                 recentCount={3}
                 currentTimeKey={reportConfig.current_month_label}
               />
               <TimeRollupTable
-                title={isEnterpriseReviewMode ? "OBL Period Activity View" : "OBL Period View"}
+                title="OBL Period View"
                 rows={drilldown.period}
                 recentCount={4}
                 currentTimeKey={currentPeriodLabel}
               />
             </div>
 
-            {!isEnterpriseReviewMode && <ExecInsights summary={report.summary} kpis={kpis} />}
+            <ExecInsights summary={report.summary} kpis={kpis} />
           </>
         ) : (
           <p className="muted">No drilldown configured for this token yet.</p>
@@ -877,9 +773,7 @@ export default function App() {
 
       {/* ── Status Footer ── */}
       <div className="status-footer">
-        <span className="status-footer-label">
-          {isEnterpriseReviewMode ? "Review status:" : "Budget status:"}
-        </span>
+        <span className="status-footer-label">Budget status:</span>
         {(() => {
           const confirmed = report.summary.filter((r) => r.approval_status === "confirmed").map((r) => r.token);
           const draft = report.summary.filter((r) => r.approval_status === "draft").map((r) => r.token);

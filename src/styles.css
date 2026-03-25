@@ -407,7 +407,7 @@ thead tr:nth-child(2) th:nth-child(8) {
   border-color: var(--review-border);
 }
 
-.badge-truth-only-review {
+.badge-enterprise-review {
   background: var(--review-bg);
   color: var(--review-fg);
   border-color: var(--review-border);

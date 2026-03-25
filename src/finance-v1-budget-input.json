@@ -1,0 +1,223 @@
+{
+  "sourceNotes": {
+    "budget_source": "Edwin / Finance confirmed input",
+    "monthly_budget_formula": "annual / 12",
+    "period_budget_formula": "annual / 26",
+    "report_year": 2026,
+    "generated_at_utc": "2026-03-25T02:41:46.953Z",
+    "instructions": "Populate yearly_budget only with Edwin / Finance confirmed values. Token-level rows are first-class. Program-level rows are optional and should remain null until confirmed."
+  },
+  "tokenBudgets": [
+    {
+      "id": "budget-token-sui",
+      "year": 2026,
+      "token": "SUI",
+      "budget_program": "All Programs",
+      "incentive_program": null,
+      "yearly_budget": 21600000,
+      "active_flag": true,
+      "approval_status": "confirmed",
+      "notes": "Fill from Edwin / Finance confirmed annual budget input."
+    },
+    {
+      "id": "budget-token-deep",
+      "year": 2026,
+      "token": "DEEP",
+      "budget_program": "All Programs",
+      "incentive_program": null,
+      "yearly_budget": 200000000,
+      "active_flag": true,
+      "approval_status": "confirmed",
+      "notes": "Fill from Edwin / Finance confirmed annual budget input."
+    },
+    {
+      "id": "budget-token-ns",
+      "year": 2026,
+      "token": "NS",
+      "budget_program": "All Programs",
+      "incentive_program": null,
+      "yearly_budget": 7150000,
+      "active_flag": true,
+      "approval_status": "confirmed",
+      "notes": "Fill from Edwin / Finance confirmed annual budget input."
+    },
+    {
+      "id": "budget-token-walrus",
+      "year": 2026,
+      "token": "Walrus",
+      "budget_program": "All Programs",
+      "incentive_program": null,
+      "yearly_budget": null,
+      "active_flag": true,
+      "approval_status": "pending",
+      "notes": "Fill from Edwin / Finance confirmed annual budget input."
+    }
+  ],
+  "programBudgets": [
+    {
+      "id": "budget-program-sui-flagship-deep",
+      "year": 2026,
+      "token": "SUI",
+      "budget_program": "Flagship",
+      "incentive_program": "Deep",
+      "yearly_budget": null,
+      "active_flag": true,
+      "approval_status": "pending",
+      "notes": "Optional program-level budget. Populate only when Finance confirms a program allocation."
+    },
+    {
+      "id": "budget-program-sui-flagship-flagship",
+      "year": 2026,
+      "token": "SUI",
+      "budget_program": "Flagship",
+      "incentive_program": "Flagship",
+      "yearly_budget": null,
+      "active_flag": true,
+      "approval_status": "pending",
+      "notes": "Optional program-level budget. Populate only when Finance confirms a program allocation."
+    },
+    {
+      "id": "budget-program-sui-flagship-lombard",
+      "year": 2026,
+      "token": "SUI",
+      "budget_program": "Flagship",
+      "incentive_program": "Lombard",
+      "yearly_budget": null,
+      "active_flag": true,
+      "approval_status": "pending",
+      "notes": "Optional program-level budget. Populate only when Finance confirms a program allocation."
+    },
+    {
+      "id": "budget-program-sui-flagship-lst",
+      "year": 2026,
+      "token": "SUI",
+      "budget_program": "Flagship",
+      "incentive_program": "LST",
+      "yearly_budget": null,
+      "active_flag": true,
+      "approval_status": "pending",
+      "notes": "Optional program-level budget. Populate only when Finance confirms a program allocation."
+    },
+    {
+      "id": "budget-program-sui-flagship-perp",
+      "year": 2026,
+      "token": "SUI",
+      "budget_program": "Flagship",
+      "incentive_program": "Perp",
+      "yearly_budget": null,
+      "active_flag": true,
+      "approval_status": "pending",
+      "notes": "Optional program-level budget. Populate only when Finance confirms a program allocation."
+    },
+    {
+      "id": "budget-program-sui-flagship-suibtc",
+      "year": 2026,
+      "token": "SUI",
+      "budget_program": "Flagship",
+      "incentive_program": "suiBTC",
+      "yearly_budget": null,
+      "active_flag": true,
+      "approval_status": "pending",
+      "notes": "Optional program-level budget. Populate only when Finance confirms a program allocation."
+    },
+    {
+      "id": "budget-program-sui-flagship-suins",
+      "year": 2026,
+      "token": "SUI",
+      "budget_program": "Flagship",
+      "incentive_program": "SuiNS",
+      "yearly_budget": null,
+      "active_flag": true,
+      "approval_status": "pending",
+      "notes": "Optional program-level budget. Populate only when Finance confirms a program allocation."
+    },
+    {
+      "id": "budget-program-sui-flagship-xbtc",
+      "year": 2026,
+      "token": "SUI",
+      "budget_program": "Flagship",
+      "incentive_program": "xBTC",
+      "yearly_budget": null,
+      "active_flag": true,
+      "approval_status": "pending",
+      "notes": "Optional program-level budget. Populate only when Finance confirms a program allocation."
+    },
+    {
+      "id": "budget-program-sui-walrus-walrus",
+      "year": 2026,
+      "token": "SUI",
+      "budget_program": "Walrus",
+      "incentive_program": "Walrus",
+      "yearly_budget": null,
+      "active_flag": true,
+      "approval_status": "pending",
+      "notes": "Optional program-level budget. Populate only when Finance confirms a program allocation."
+    },
+    {
+      "id": "budget-program-deep-deep-deep",
+      "year": 2026,
+      "token": "DEEP",
+      "budget_program": "Deep",
+      "incentive_program": "Deep",
+      "yearly_budget": null,
+      "active_flag": true,
+      "approval_status": "pending",
+      "notes": "Optional program-level budget. Populate only when Finance confirms a program allocation."
+    },
+    {
+      "id": "budget-program-deep-lombard-lombard",
+      "year": 2026,
+      "token": "DEEP",
+      "budget_program": "Lombard",
+      "incentive_program": "Lombard",
+      "yearly_budget": null,
+      "active_flag": true,
+      "approval_status": "pending",
+      "notes": "Optional program-level budget. Populate only when Finance confirms a program allocation."
+    },
+    {
+      "id": "budget-program-deep-suibtc-suibtc",
+      "year": 2026,
+      "token": "DEEP",
+      "budget_program": "suiBTC",
+      "incentive_program": "suiBTC",
+      "yearly_budget": null,
+      "active_flag": true,
+      "approval_status": "pending",
+      "notes": "Optional program-level budget. Populate only when Finance confirms a program allocation."
+    },
+    {
+      "id": "budget-program-deep-suibtc-tbtc",
+      "year": 2026,
+      "token": "DEEP",
+      "budget_program": "suiBTC",
+      "incentive_program": "tBTC",
+      "yearly_budget": null,
+      "active_flag": true,
+      "approval_status": "pending",
+      "notes": "Optional program-level budget. Populate only when Finance confirms a program allocation."
+    },
+    {
+      "id": "budget-program-ns-suins-suins",
+      "year": 2026,
+      "token": "NS",
+      "budget_program": "SuiNS",
+      "incentive_program": "SuiNS",
+      "yearly_budget": null,
+      "active_flag": true,
+      "approval_status": "pending",
+      "notes": "Optional program-level budget. Populate only when Finance confirms a program allocation."
+    },
+    {
+      "id": "budget-program-walrus-walrus-walrus",
+      "year": 2026,
+      "token": "Walrus",
+      "budget_program": "Walrus",
+      "incentive_program": "Walrus",
+      "yearly_budget": null,
+      "active_flag": true,
+      "approval_status": "pending",
+      "notes": "Optional program-level budget. Populate only when Finance confirms a program allocation."
+    }
+  ]
+}
