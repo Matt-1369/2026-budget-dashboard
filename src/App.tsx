@@ -65,6 +65,12 @@ function PendingValue({ label = "Pending confirmation" }: { label?: string }) {
   return <em className="pending-value">{label}</em>;
 }
 
+function getExecutiveBudgetFallbackLabel(): string {
+  return activeDataSource.budgetFallbackLabel === "Finance input not loaded"
+    ? "Awaiting finance input"
+    : activeDataSource.budgetFallbackLabel;
+}
+
 function CurrencyCell({
   value,
   pendingLabel = "Pending confirmation",
@@ -112,12 +118,22 @@ function ReviewNotice() {
 
   return (
     <section className="review-note">
-      <div className="review-note-title">{activeDataSource.reviewNote.title}</div>
-      <ul className="review-note-list">
-        {activeDataSource.reviewNote.bullets.map((bullet) => (
-          <li key={bullet}>{bullet}</li>
-        ))}
-      </ul>
+      <div className="review-note-summary">
+        <div>
+          <div className="review-note-eyebrow">Source Context</div>
+          <div className="review-note-title">{activeDataSource.reviewNote.title}</div>
+        </div>
+        <div className="context-chip-group">
+          <span className="context-chip">{activeDataSource.reviewNote.bullets.length} review notes</span>
+        </div>
+      </div>
+      <CollapsibleSection title="Review source assumptions" defaultOpen={false}>
+        <ul className="review-note-list">
+          {activeDataSource.reviewNote.bullets.map((bullet) => (
+            <li key={bullet}>{bullet}</li>
+          ))}
+        </ul>
+      </CollapsibleSection>
     </section>
   );
 }
@@ -153,32 +169,44 @@ function KpiCard({
 }
 
 function KpiStrip({ kpis }: { kpis: KPIData }) {
+  const compactBudgetFallbackLabel = getExecutiveBudgetFallbackLabel();
   const utilStr =
     kpis.budgetUtilization !== null
       ? `${formatPercent(kpis.budgetUtilization)} utilized`
       : undefined;
+  const annualPending = kpis.totalAnnualBudget === null;
+  const remainingPending = kpis.remainingBudget === null;
   const remainingStr =
-    kpis.remainingBudget !== null
+    !remainingPending
       ? formatCurrency(kpis.remainingBudget)
-      : activeDataSource.budgetFallbackLabel;
+      : compactBudgetFallbackLabel;
   const annualStr =
-    kpis.totalAnnualBudget !== null
+    !annualPending
       ? formatCurrency(kpis.totalAnnualBudget)
-      : activeDataSource.budgetFallbackLabel;
+      : compactBudgetFallbackLabel;
   const remainingSubtitle =
-    kpis.remainingBudget !== null
+    !remainingPending
       ? utilStr
-      : "Remaining budget is unavailable until the Finance input file is populated for those rows.";
+      : "Awaiting local finance annual input for rows still missing a populated budget.";
+  const annualSubtitle = annualPending
+    ? "Totals stay conservative until missing annual inputs are populated locally."
+    : "Current reporting total across rows with populated annual budgets.";
 
   return (
     <div className="kpi-strip">
-      <KpiCard label="Annual Budget (Current)" value={annualStr} />
+      <KpiCard
+        label="Annual Budget (Current)"
+        value={annualStr}
+        valueClass={annualPending ? "kpi-value-pending" : undefined}
+        subtitle={annualSubtitle}
+      />
       <div className="kpi-divider" />
       <KpiCard label="YTD Actual Spend" value={formatCurrency(kpis.ytdActualSpend)} />
       <div className="kpi-divider" />
       <KpiCard
         label="Remaining Budget"
         value={remainingStr}
+        valueClass={remainingPending ? "kpi-value-pending" : undefined}
         subtitle={remainingSubtitle}
       />
     </div>
@@ -197,6 +225,7 @@ function TokenCard({
   isSelected: boolean;
 }) {
   const isPending = row.annual_budget === null;
+  const compactBudgetFallbackLabel = getExecutiveBudgetFallbackLabel();
   const utilization =
     row.annual_budget !== null && row.annual_budget > 0
       ? Math.min(row.actual_ytd / row.annual_budget, 1)
@@ -222,7 +251,7 @@ function TokenCard({
       className={`token-card${isSelected ? " selected" : ""}${isPending ? " pending-state" : ""}`}
     >
       <div className="token-card-header">
-        <button className="link-button" onClick={onSelect}>
+        <button className="link-button token-card-token" onClick={onSelect} type="button">
           {row.token}
         </button>
         <StatusBadge value={row.approval_status} />
@@ -230,14 +259,19 @@ function TokenCard({
 
       {isPending ? (
         <div className="token-card-pending-msg">
-          <PendingValue label={activeDataSource.budgetFallbackLabel} />
-          <div className="token-card-pending-summary">
-            YTD actual: {formatCurrency(row.actual_ytd)} · {reportConfig.current_month_label} actual:{" "}
-            {formatCurrency(row.current_month_actual)} · {currentPeriodLabel} actual:{" "}
-            {formatCurrency(row.current_period_actual)}
+          <div className="token-card-pending-label">
+            <PendingValue label={compactBudgetFallbackLabel} />
           </div>
-          <div className="note">
-            Budget source-of-truth is confirmed for v1, but the local Finance input file does not yet include an annual value for this row.
+          <div className="token-card-pending-summary">
+            Annual budget remains unfilled in the local finance input for this row.
+          </div>
+          <div className="token-card-inline-metrics">
+            <span>YTD {formatCurrency(row.actual_ytd)}</span>
+            <span>{reportConfig.current_month_label} {formatCurrency(row.current_month_actual)}</span>
+            <span>{currentPeriodLabel} {formatCurrency(row.current_period_actual)}</span>
+          </div>
+          <div className="note token-card-note">
+            Actuals still follow the confirmed SQL source used in enterprise review mode.
           </div>
         </div>
       ) : (
@@ -250,20 +284,20 @@ function TokenCard({
               </div>
             </div>
             <div className="token-card-metric">
+              <div className="token-card-metric-label">Remaining</div>
+              <div className="token-card-metric-value">
+                {row.remaining_budget !== null
+                  ? formatCurrency(row.remaining_budget)
+                  : compactBudgetFallbackLabel}
+              </div>
+            </div>
+            <div className="token-card-metric">
               <div className="token-card-metric-label">YTD Actual</div>
               <div className="token-card-metric-value">
                 {formatCurrency(row.actual_ytd)}
               </div>
             </div>
-              <div className="token-card-metric">
-                <div className="token-card-metric-label">Remaining</div>
-                <div className="token-card-metric-value">
-                  {row.remaining_budget !== null
-                    ? formatCurrency(row.remaining_budget)
-                    : activeDataSource.budgetFallbackLabel}
-                </div>
-              </div>
-            </div>
+          </div>
 
           {utilization !== null && (
             <div className="progress-bar-track">
@@ -328,12 +362,15 @@ function TimeRollupTable({
   rows,
   recentCount,
   currentTimeKey,
+  embedded = false,
 }: {
   title: string;
   rows: TimeRollupRow[];
   recentCount?: number;
   currentTimeKey?: string;
+  embedded?: boolean;
 }) {
+  const compactBudgetFallbackLabel = getExecutiveBudgetFallbackLabel();
   const [showAll, setShowAll] = useState(false);
 
   const allTimeKeys = useMemo(() => {
@@ -366,18 +403,25 @@ function TimeRollupTable({
   }, [rows, recentCount, showAll, visibleTimeKeys]);
 
   const hiddenCount = allTimeKeys.length - visibleTimeKeys.length;
+  const timeUnitLabel = title === "Monthly View" ? "months" : "periods";
+  const tableMeta = recentCount
+    ? `Showing ${visibleTimeKeys.length} recent ${timeUnitLabel}${hiddenCount > 0 ? ` of ${allTimeKeys.length}` : ""}`
+    : `${allTimeKeys.length} ${timeUnitLabel}`;
 
   return (
-    <section className="panel time-panel">
+    <section className={`time-panel${embedded ? " time-panel-embedded" : " panel"}`}>
       <div className="panel-header">
-        <h3>{title}</h3>
+        <div>
+          <h3>{title}</h3>
+          <div className="table-meta">{tableMeta}</div>
+        </div>
       </div>
-      <div className="table-scroll">
-        <table>
+      <div className="table-scroll table-scroll-soft">
+        <table className="data-table time-rollup-table">
           <thead>
             <tr>
               <th>Program</th>
-              <th>Period</th>
+              <th>{title === "Monthly View" ? "Month" : "Period"}</th>
               <th className="num-col">Budget</th>
               <th className="num-col">Actual</th>
               <th className="num-col">Variance</th>
@@ -391,13 +435,13 @@ function TimeRollupTable({
                 <td>{row.time_key}</td>
                 <CurrencyCell
                   value={row.budget}
-                  pendingLabel={activeDataSource.budgetFallbackLabel}
+                  pendingLabel={compactBudgetFallbackLabel}
                 />
                 <td className="num-col">{formatCurrency(row.actual)}</td>
                 <VarianceCell
                   value={row.variance}
                   pct={null}
-                  pendingLabel={activeDataSource.budgetFallbackLabel}
+                  pendingLabel={compactBudgetFallbackLabel}
                 />
                 <td className="num-col">
                   {row.variance_pct !== null ? (
@@ -413,7 +457,7 @@ function TimeRollupTable({
                       {formatPercent(row.variance_pct)}
                     </span>
                   ) : (
-                    <PendingValue label={activeDataSource.budgetFallbackLabel} />
+                    <PendingValue label={compactBudgetFallbackLabel} />
                   )}
                 </td>
               </tr>
@@ -438,21 +482,22 @@ function TimeRollupTable({
 // ─── Drilldown Table ──────────────────────────────────────────────────────────
 
 function DrilldownTable({ rows }: { rows: AnnualRollup[] }) {
+  const compactBudgetFallbackLabel = getExecutiveBudgetFallbackLabel();
   return (
-    <div className="table-scroll">
-      <table>
+    <div className="table-scroll table-scroll-soft">
+      <table className="data-table drilldown-table">
         <thead>
           <tr>
             <th>Program</th>
-            <th className="num-col">Annual Budget</th>
-            <th className="num-col">YTD Actual</th>
+            <th className="num-col">Annual</th>
+            <th className="num-col">YTD</th>
             <th className="num-col">Remaining</th>
-            <th className="num-col">Monthly Budget</th>
-            <th className="num-col">Cur. Month Actual</th>
+            <th className="num-col">Month Budget</th>
+            <th className="num-col">Month Actual</th>
             <th className="num-col">Period Budget</th>
-            <th className="num-col">Cur. Period Actual</th>
+            <th className="num-col">Period Actual</th>
             <th className="num-col">Variance</th>
-            <th>Notes</th>
+            <th className="col-note">Notes</th>
           </tr>
         </thead>
         <tbody>
@@ -461,27 +506,27 @@ function DrilldownTable({ rows }: { rows: AnnualRollup[] }) {
               <td>{row.reporting_bucket}</td>
               <CurrencyCell
                 value={row.annual_budget}
-                pendingLabel={activeDataSource.budgetFallbackLabel}
+                pendingLabel={compactBudgetFallbackLabel}
               />
               <td className="num-col">{formatCurrency(row.actual_ytd)}</td>
               <CurrencyCell
                 value={row.remaining_budget}
-                pendingLabel={activeDataSource.budgetFallbackLabel}
+                pendingLabel={compactBudgetFallbackLabel}
               />
               <CurrencyCell
                 value={row.monthly_budget}
-                pendingLabel={activeDataSource.budgetFallbackLabel}
+                pendingLabel={compactBudgetFallbackLabel}
               />
               <td className="num-col">{formatCurrency(row.current_month_actual)}</td>
               <CurrencyCell
                 value={row.period_budget}
-                pendingLabel={activeDataSource.budgetFallbackLabel}
+                pendingLabel={compactBudgetFallbackLabel}
               />
               <td className="num-col">{formatCurrency(row.current_period_actual)}</td>
               <VarianceCell
                 value={row.variance}
                 pct={row.variance_pct}
-                pendingLabel={activeDataSource.budgetFallbackLabel}
+                pendingLabel={compactBudgetFallbackLabel}
               />
               <td>{row.notes[0]}</td>
             </tr>
@@ -501,6 +546,7 @@ function ExecInsights({
   summary: AnnualRollup[];
   kpis: KPIData;
 }) {
+  const compactBudgetFallbackLabel = getExecutiveBudgetFallbackLabel();
   const confirmedTokens = summary
     .filter((r) => r.approval_status === "confirmed")
     .map((r) => r.token);
@@ -521,13 +567,13 @@ function ExecInsights({
 
   return (
     <div className="exec-insights">
-      <div className="exec-insights-title">Key Observations</div>
+      <div className="exec-insights-title">Executive Readout</div>
       <ul className="exec-insights-list">
         {includedTokens.length > 0 ? (
           <li>
             Current reporting total across {includedTokens.length} token
             {includedTokens.length !== 1 ? "s" : ""} ({includedTokens.join(", ")}
-            ): <strong>{kpis.totalAnnualBudget !== null ? formatCurrency(kpis.totalAnnualBudget) : activeDataSource.budgetFallbackLabel}</strong>.
+            ): <strong>{kpis.totalAnnualBudget !== null ? formatCurrency(kpis.totalAnnualBudget) : compactBudgetFallbackLabel}</strong>.
             {confirmedTokens.length > 0 && (
               <>{" "}Confirmed: {confirmedTokens.join(", ")}.</>
             )}
@@ -537,13 +583,12 @@ function ExecInsights({
           </li>
         ) : (
           <li>
-            Budget source-of-truth is confirmed for v1, but the local Finance input file does not yet include populated annual budget rows.
+            Annual budgets are still absent from the local finance input, while actuals remain sourced from the confirmed SQL export.
           </li>
         )}
         {pendingTokens.length > 0 && (
           <li>
-            Annual budget values are not populated in the local Finance input file for{" "}
-            <strong>{pendingTokens.join(", ")}</strong> — not included in totals.
+            Missing local annual inputs for <strong>{pendingTokens.join(", ")}</strong> keep those rows visible but excluded from current totals.
           </li>
         )}
         {includedTokens.length === 0 && (
@@ -567,9 +612,10 @@ function UnmappedRowsPanel({ rows }: { rows: RawActualDetailRow[] }) {
   if (rows.length === 0) {
     return null;
   }
+  const totalUnmappedActual = rows.reduce((sum, row) => sum + row.amount, 0);
 
   return (
-    <section className="panel">
+    <section className="panel panel-quiet">
       <div className="panel-header">
         <div>
           <h2>Unmapped Raw Activity</h2>
@@ -577,35 +623,41 @@ function UnmappedRowsPanel({ rows }: { rows: RawActualDetailRow[] }) {
             These rows stay visible because they do not have an active mapping match.
           </p>
         </div>
+        <div className="context-chip-group">
+          <span className="context-chip">Not in totals</span>
+          <span className="context-chip">{formatCurrency(totalUnmappedActual)}</span>
+        </div>
       </div>
-      <div className="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Token</th>
-              <th>Program Raw</th>
-              <th>Protocol</th>
-              <th>Pool</th>
-              <th>Period</th>
-              <th className="num-col">Actual</th>
-              <th>Reason</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id}>
-                <td>{row.token_raw}</td>
-                <td>{row.program_raw}</td>
-                <td>{row.protocol_raw}</td>
-                <td>{row.pool_raw}</td>
-                <td>{row.period_id}</td>
-                <td className="num-col">{formatCurrency(row.amount)}</td>
-                <td>{row.metadata.unmapped_reason ?? row.metadata.issue ?? "Pending mapping review"}</td>
+      <CollapsibleSection title={`Review ${rows.length} unmapped row${rows.length !== 1 ? "s" : ""}`} defaultOpen={false}>
+        <div className="table-scroll table-scroll-soft">
+          <table className="data-table unmapped-table">
+            <thead>
+              <tr>
+                <th>Token</th>
+                <th>Program Raw</th>
+                <th>Protocol</th>
+                <th>Pool</th>
+                <th>Period</th>
+                <th className="num-col">Actual</th>
+                <th>Reason</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td>{row.token_raw}</td>
+                  <td>{row.program_raw}</td>
+                  <td>{row.protocol_raw}</td>
+                  <td>{row.pool_raw}</td>
+                  <td>{row.period_id}</td>
+                  <td className="num-col">{formatCurrency(row.amount)}</td>
+                  <td>{row.metadata.unmapped_reason ?? row.metadata.issue ?? "Pending mapping review"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleSection>
     </section>
   );
 }
@@ -672,6 +724,9 @@ export default function App() {
         <div className="exec-header-title-block">
           <p className="eyebrow">2026 Budget Report</p>
           <h1>Budget vs Actual Dashboard</h1>
+          <p className="exec-header-summary">
+            Executive desktop view for current budget coverage, actual spend, and drilldown risk without changing reporting semantics.
+          </p>
         </div>
         <div className="exec-header-meta">
           <span className="meta-pill">
@@ -695,8 +750,6 @@ export default function App() {
         </div>
       </header>
 
-      <ReviewNotice />
-
       {/* ── KPI Hero Strip ── */}
       <KpiStrip kpis={kpis} />
 
@@ -718,8 +771,6 @@ export default function App() {
         />
       </section>
 
-      <UnmappedRowsPanel rows={unmappedRows} />
-
       {/* ── Token Drilldown ── */}
       <section className="panel">
         <div className="panel-header">
@@ -736,6 +787,7 @@ export default function App() {
                 key={token}
                 className={token === selectedToken ? "tab active" : "tab"}
                 onClick={() => setSelectedToken(token)}
+                type="button"
               >
                 {token}
               </button>
@@ -745,31 +797,40 @@ export default function App() {
 
         {drilldown ? (
           <>
-            <CollapsibleSection title="Annual Breakdown" defaultOpen={false}>
-              <DrilldownTable rows={drilldown.annual} />
-            </CollapsibleSection>
+            <ExecInsights summary={report.summary} kpis={kpis} />
 
-            <div className="two-column">
+            <CollapsibleSection title="Current Monthly View" defaultOpen={true}>
               <TimeRollupTable
                 title="Monthly View"
                 rows={drilldown.monthly}
                 recentCount={3}
                 currentTimeKey={reportConfig.current_month_label}
+                embedded={true}
               />
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Annual Breakdown" defaultOpen={false}>
+              <DrilldownTable rows={drilldown.annual} />
+            </CollapsibleSection>
+
+            <CollapsibleSection title="OBL Period View" defaultOpen={false}>
               <TimeRollupTable
                 title="OBL Period View"
                 rows={drilldown.period}
                 recentCount={4}
                 currentTimeKey={currentPeriodLabel}
+                embedded={true}
               />
-            </div>
-
-            <ExecInsights summary={report.summary} kpis={kpis} />
+            </CollapsibleSection>
           </>
         ) : (
           <p className="muted">No drilldown configured for this token yet.</p>
         )}
       </section>
+
+      <ReviewNotice />
+
+      <UnmappedRowsPanel rows={unmappedRows} />
 
       {/* ── Status Footer ── */}
       <div className="status-footer">
@@ -790,7 +851,7 @@ export default function App() {
                 <><span className="status-footer-sep">·</span><span><strong>Pending:</strong> {pending.join(", ")}</span></>
               )}
               <span className="status-footer-sep">·</span>
-              <span className="status-footer-also-pending">{activeDataSource.footerPendingNote}</span>
+              <span className="status-footer-also-pending">Context: {activeDataSource.footerPendingNote}</span>
             </>
           );
         })()}
